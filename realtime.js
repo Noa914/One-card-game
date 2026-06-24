@@ -25,8 +25,12 @@
   RT.initUI = function () {
     const status = document.getElementById('rt-status');
     const hostBtn = document.getElementById('btn-host');
-    if (!cfgValid() || typeof firebase === 'undefined') {
-      status.textContent = '오프라인 · 한 기기 패스앤플레이';
+    if (typeof firebase === 'undefined') {
+      status.textContent = '오프라인 · Firebase 스크립트 미로드 (인터넷 연결 확인) — 패스앤플레이만 가능';
+      return;
+    }
+    if (!cfgValid()) {
+      status.textContent = '오프라인 · firebase-config.js 를 채워야 온라인 가능 (현재 YOUR_ 값) — 패스앤플레이만 가능';
       return;
     }
     try {
@@ -37,8 +41,8 @@
       status.classList.add('on');
       hostBtn.disabled = false;
     } catch (e) {
-      status.textContent = '온라인 초기화 실패 — 패스앤플레이로 진행하세요';
-      console.error(e);
+      status.textContent = '온라인 초기화 실패: ' + (e && e.message ? e.message : e) + ' — 패스앤플레이로 진행하세요';
+      console.error('[원카드] firebase init 실패', e);
     }
     // 초대 링크에 ?room= 있으면 자동 채움
     const r = new URLSearchParams(location.search).get('room');
@@ -51,7 +55,11 @@
 
   /* ── 호스트: 방 생성 ── */
   RT.host = function (cfg) {
-    if (!ready) { App.toast('온라인이 비활성 상태예요'); return; }
+    if (!ready) {
+      App.toast('온라인 비활성 — firebase-config.js 확인');
+      console.warn('[원카드] RT.host: ready=false (firebase 미초기화 또는 config 미설정)');
+      return;
+    }
     hostCfg = cfg; isHost = true; App.isHost = true; App.mode = 'online';
     roomCode = code4(); myPid = newPid(); App.myPid = myPid;
     const myName = (document.getElementById('rt-myname').value.trim()) || (cfg.players[0] && cfg.players[0].name) || '마스터';
@@ -63,30 +71,48 @@
       move: null, state: null,
     };
     room.players[myPid] = { id: myPid, name: myName, joinedAt: Date.now() };
+    App.toast('방 생성 중…');
     roomRef().set(room).then(() => {
       App.showGame();
       document.getElementById('room-info').innerHTML = `방 <b>${roomCode}</b>`;
       openLobby();
       listenRoom();
       listenMovesAsHost();
+    }).catch(err => {
+      console.error('[원카드] 방 생성 실패', err);
+      const msg = /permission|PERMISSION/.test(err.message || '')
+        ? '쓰기 권한 거부 — DB 보안 규칙(rooms .read/.write true) 게시 확인'
+        : '방 생성 실패: ' + (err.message || err);
+      App.toast(msg);
+      isHost = false; App.mode = 'hotseat';
     });
   };
 
   /* ── 플레이어: 참가 ── */
   RT.join = function (code, name) {
-    if (!ready) { App.toast('온라인이 비활성 상태예요'); return; }
+    if (!ready) {
+      App.toast('온라인 비활성 — firebase-config.js 확인');
+      console.warn('[원카드] RT.join: ready=false');
+      return;
+    }
     roomCode = code.toUpperCase(); myPid = newPid(); App.myPid = myPid;
     isHost = false; App.isHost = false; App.mode = 'online';
     roomRef().get().then(snap => {
-      if (!snap.exists()) { App.toast('그런 방이 없어요'); return; }
+      if (!snap.exists()) { App.toast('그런 방이 없어요 (코드 확인)'); return; }
       const room = snap.val();
       if (room.phase !== 'lobby') { App.toast('이미 시작된 방이에요'); return; }
-      roomRef('players/' + myPid).set({ id: myPid, name, joinedAt: Date.now() }).then(() => {
+      return roomRef('players/' + myPid).set({ id: myPid, name, joinedAt: Date.now() }).then(() => {
         App.showGame();
         document.getElementById('room-info').innerHTML = `방 <b>${roomCode}</b>`;
         openLobby();
         listenRoom();
       });
+    }).catch(err => {
+      console.error('[원카드] 참가 실패', err);
+      const msg = /permission|PERMISSION/.test(err.message || '')
+        ? '읽기 권한 거부 — DB 보안 규칙 게시 확인'
+        : '참가 실패: ' + (err.message || err);
+      App.toast(msg);
     });
   };
 
