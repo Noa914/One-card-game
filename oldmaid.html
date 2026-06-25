@@ -42,6 +42,17 @@
 
   .status{text-align:center;font-size:clamp(16px,4.5vw,22px);color:var(--ivory);padding:14px 16px 6px;min-height:30px}
   .status b{color:var(--gold)}
+
+  .stage{display:flex;gap:30px;justify-content:center;align-items:flex-start;padding:16px 14px 4px;flex-wrap:wrap;min-height:calc(var(--card-w)*1.4)}
+  .pile-box{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .pile-lab{font-size:13.5px;color:var(--muted)} .pile-lab b{color:var(--gold)}
+  .pile-cards{display:flex;align-items:center}
+  #target-cards{--card-w:clamp(46px,11vw,74px)}
+  #discard-cards{--card-w:clamp(46px,11vw,74px);gap:6px}
+  #target-cards .fd{transition:transform .12s,box-shadow .12s}
+  #stage.mine #target-cards .fd{box-shadow:0 0 0 1px rgba(232,177,58,.5),0 6px 16px rgba(0,0,0,.45)}
+  #target-cards .fd.pickable{cursor:pointer}
+  #target-cards .fd.pickable:hover{transform:translateY(-12px);box-shadow:0 0 0 2px var(--gold),0 12px 22px rgba(0,0,0,.5);z-index:2}
   .myhand-wrap{padding:8px 14px 36px}
   .mhead{display:flex;justify-content:space-between;max-width:980px;margin:0 auto 8px;padding:0 4px;align-items:center}
   .mhead .nm{font-weight:800}.mhead .nm .you{color:var(--gold);font-size:12px;margin-left:6px}
@@ -93,6 +104,16 @@
     </div>
   </div>
   <div class="opp" id="opp"></div>
+  <div class="stage" id="stage">
+    <div class="pile-box" id="target-box">
+      <div class="pile-lab" id="target-lab"></div>
+      <div class="pile-cards" id="target-cards"></div>
+    </div>
+    <div class="pile-box" id="discard-box" style="visibility:hidden">
+      <div class="pile-lab">버린 짝</div>
+      <div class="pile-cards" id="discard-cards"></div>
+    </div>
+  </div>
   <div class="status" id="status"></div>
   <div class="myhand-wrap">
     <div class="mhead"><div class="nm">나 <span class="you">YOU</span></div><div class="muted" id="mycount" style="color:var(--muted);font-size:14px"></div></div>

@@ -30,15 +30,14 @@
     if (card.suit === 'JOKER') {
       el.classList.add('joker');
       el.innerHTML =
-        `<div class="corner tl"><span class="r">JOKER</span></div>
-         <div class="pip">JOKER</div>
-         <div class="corner br"><span class="r">JOKER</span></div>`;
-      el.querySelectorAll('.corner .r').forEach(n => { n.style.fontSize = '9px'; n.style.fontWeight = '800'; });
+        `<div class="corner tl"><span class="r">JKR</span></div>
+         <div class="pip"><span class="jk">JOKER</span></div>
+         <div class="corner br"><span class="r">JKR</span></div>`;
     } else {
       const sym = SUIT_SYM[card.suit];
       el.innerHTML =
         `<div class="corner tl"><span class="r">${card.rank}</span><span class="s">${sym}</span></div>
-         <div class="pip">${sym}<span style="position:absolute;font-size:20px;font-family:Pretendard,sans-serif;color:inherit;transform:translateY(38px)">${card.rank}</span></div>
+         <div class="pip"><span class="psym">${sym}</span><span class="prank">${card.rank}</span></div>
          <div class="corner br"><span class="r">${card.rank}</span><span class="s">${sym}</span></div>`;
     }
     if (opt.playable) el.classList.add('playable');
@@ -60,6 +59,7 @@
       top: pub.top, currentSuit: pub.currentSuit, deckCount: pub.deckCount,
       dir: pub.dir, pendingAttack: pub.pendingAttack, attackActive: pub.attackActive,
       winner: pub.winner, log: pub.log,
+      lastAction: pub.lastAction, rules: pub.rules,
       turnPlayerId: pub.turnPlayerId,
       turnPlayerName: g.playerName(pub.turnPlayerId),
       myPid: viewPid,
@@ -92,6 +92,7 @@
       top: pub.top, currentSuit: pub.currentSuit, deckCount: pub.deckCount,
       dir: pub.dir, pendingAttack: pub.pendingAttack, attackActive: pub.attackActive,
       winner: pub.winner, log: pub.log || [],
+      lastAction: pub.lastAction, rules: pub.rules,
       turnPlayerId: pub.turnPlayerId,
       turnPlayerName: (pub.players.find(p => p.id === pub.turnPlayerId) || {}).name,
       myPid, myHand: myHand.slice(),
@@ -192,6 +193,9 @@
 
     // 승리
     if (vm.winner) showWin(vm.players.find(p => p.id === vm.winner));
+
+    // 효과음 · 이펙트
+    if (window.Effects) Effects.onRender(vm);
   }
 
   function renderLog(log) {
@@ -327,6 +331,7 @@
     App.cfg = cfg; App.mode = 'hotseat';
     App.game = new OneCard.OneCardGame(cfg);
     App._rules = App.game.rules;
+    if (window.Effects) Effects.reset();
     $('#room-info').textContent = '한 기기 · 패스앤플레이';
     App.showGame();
     const first = App.game.currentPlayer();
@@ -335,6 +340,7 @@
   App.startHotseatFromCfg = function () { // 새 판
     App.game = new OneCard.OneCardGame(App.cfg);
     App._rules = App.game.rules;
+    if (window.Effects) Effects.reset();
     const first = App.game.currentPlayer();
     showCover(first, () => render(vmFromEngine(App.game, first.id)));
   };
@@ -378,6 +384,13 @@
 
     // 로그 토글
     $('#log-toggle').addEventListener('click', () => $('#logbox').classList.toggle('show'));
+    // 음소거 토글
+    const muteBtn = $('#btn-mute');
+    if (muteBtn && window.Effects) {
+      const sync = () => { muteBtn.textContent = Effects.isMuted() ? '🔇' : '🔊'; muteBtn.title = Effects.isMuted() ? '소리 켜기' : '소리 끄기'; };
+      sync();
+      muteBtn.addEventListener('click', () => { Effects.unlock(); Effects.setMuted(!Effects.isMuted()); sync(); });
+    }
     // 덱 클릭 = 뽑기(가능 시)
     $('#deck-pile').addEventListener('click', () => {
       const btn = $('#actions button:not([disabled])');

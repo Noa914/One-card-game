@@ -152,22 +152,49 @@
   function render() {
     const vm = currentVM(); if (!vm) return;
     const myId = vm.myId;
+    if (!vm.lastDraw) App2.lastPair = null;
+
+    // 상대 좌석 (정보 표시만 — 뽑기는 중앙에서)
     const opp = $('#opp'); opp.innerHTML = '';
     vm.players.forEach((p) => {
       if (p.id === myId) return;
-      const isPick = p.isTarget && vm.turnId === myId && !vm.loser;
       const seat = document.createElement('div');
-      seat.className = 'seat' + (p.isTurn ? ' turn' : '') + (isPick ? ' target' : '');
+      seat.className = 'seat' + (p.isTurn ? ' turn' : '') + (p.isTarget && !vm.loser ? ' target' : '');
       const fanN = Math.min(p.count, 8);
       let fan = '';
-      for (let i = 0; i < fanN; i++) fan += `<span class="mb${isPick ? ' pick' : ''}" data-idx="${i}"></span>`;
+      for (let i = 0; i < fanN; i++) fan += `<span class="mb"></span>`;
       seat.innerHTML = `<div class="snm">${p.safe ? '✅ ' : ''}${esc(p.name)}${p.isTurn ? ' <span class="tn">●</span>' : ''}</div>
         <div class="fan">${fan || '<span class="done">안전</span>'}</div>
         <div class="scnt">${p.count > 0 ? p.count + '장' : ''}</div>`;
-      if (isPick) seat.querySelectorAll('.mb.pick').forEach(mb => mb.addEventListener('click', () => humanDraw(+mb.dataset.idx)));
       opp.appendChild(seat);
     });
 
+    // 중앙 무대 — 뽑을 대상 카드 + 버린 짝
+    const tIdx = vm.targetIdx;
+    const tlab = $('#target-lab'), tcards = $('#target-cards');
+    tcards.innerHTML = '';
+    const isMyPick = vm.turnId === myId && !vm.loser;
+    $('#stage').classList.toggle('mine', isMyPick);
+    if (!vm.loser && tIdx >= 0) {
+      const tp = vm.players[tIdx];
+      tlab.innerHTML = isMyPick
+        ? `👆 <b>${esc(tp.name)}</b> 에게서 한 장 뽑기`
+        : `${esc(nmIn(vm.players, vm.turnId))} → <b>${esc(tp.name)}</b>`;
+      for (let i = 0; i < tp.count; i++) {
+        const el = Cards.el(null, { faceDown: true }); el.classList.add('fd');
+        if (i > 0) el.style.marginLeft = 'calc(var(--card-w) * -0.5)';
+        if (isMyPick) { el.classList.add('pickable'); el.addEventListener('click', () => humanDraw(i)); }
+        tcards.appendChild(el);
+      }
+    } else { tlab.textContent = vm.loser ? '게임 종료' : ''; }
+
+    // 버린 짝 (어떤 세트가 나갔는지)
+    if (vm.lastDraw && vm.lastDraw.pairedCards && vm.lastDraw.pairedCards.length) App2.lastPair = vm.lastDraw.pairedCards;
+    const dcards = $('#discard-cards'); dcards.innerHTML = '';
+    (App2.lastPair || []).forEach(c => dcards.appendChild(Cards.el(c)));
+    $('#discard-box').style.visibility = (App2.lastPair && App2.lastPair.length) ? 'visible' : 'hidden';
+
+    // 상태
     const me = vm.players.find(p => p.id === myId) || { count: 0, safe: false };
     if (vm.loser) {
       $('#status').innerHTML = vm.loser === myId
@@ -175,11 +202,8 @@
         : `<b>${esc(nmIn(vm.players, vm.loser))}</b> 가 도둑! 나는 안전 🎉`;
     } else if (me.safe) {
       $('#status').innerHTML = '나는 <b style="color:var(--ok)">안전</b> — 도둑이 돌아다니는 중…';
-    } else if (vm.turnId === myId) {
-      const tIdx = vm.targetIdx;
-      $('#status').innerHTML = tIdx >= 0
-        ? `내 차례 — <b>${esc(vm.players[tIdx].name)}</b> 의 카드에서 한 장 뽑기`
-        : '내 차례';
+    } else if (isMyPick) {
+      $('#status').innerHTML = '내 차례 — 위 카드 중 하나를 골라 뽑으세요';
     } else {
       $('#status').innerHTML = `<b>${esc(nmIn(vm.players, vm.turnId))}</b> 차례…`;
     }
@@ -192,6 +216,7 @@
     if (vm.loser) endGame(vm);
     else { const r = $('#result'); if (r) r.classList.remove('show'); }
   }
+  function pairLabel(cards) { return (cards || []).map(c => Cards.label(c)).join(' '); }
 
   /* 뽑기 */
   function humanDraw(idx) {
@@ -207,7 +232,8 @@
     if (!r.ok) { busy = false; return; }
     const ld = App2.game.lastDraw;
     Sfx.flip();
-    Fx.toast(`<b>${esc(App2.game.name(ld.byId))}</b> 가 뽑음<br>${Cards.label(ld.card)}${ld.paired ? ' · 짝! 버림' : ''}`, ld.paired ? 1100 : 850);
+    const pl = ld.paired ? ` · <span style="color:var(--ok)">${esc(pairLabel(ld.pairedCards))} 짝! 버림</span>` : '';
+    Fx.toast(`<b>${esc(App2.game.name(ld.byId))}</b> 가 뽑음<br>${Cards.label(ld.card)}${pl}`, ld.paired ? 1300 : 850);
     if (ld.paired) { Sfx.pair(); Fx.sparkle('white'); }
     setTimeout(() => { render(); busy = false; maybeBot(); }, 700);
   }
@@ -223,7 +249,7 @@
       const tCount = tIdx >= 0 ? g.count(g.players[tIdx].id) : 0;
       g.draw(tCount > 0 ? Math.floor(Math.random() * tCount) : 0);
       const ld = g.lastDraw;
-      if (ld) { ld.paired ? Sfx.pair() : Sfx.flip(); Fx.toast(`<b>${esc(g.name(ld.byId))}</b> ← ${esc(g.name(ld.fromId))}${ld.paired ? ' · 짝!' : ''}`, 700); }
+      if (ld) { ld.paired ? Sfx.pair() : Sfx.flip(); Fx.toast(`<b>${esc(g.name(ld.byId))}</b> ← ${esc(g.name(ld.fromId))}${ld.paired ? ' · <span style="color:var(--ok)">' + esc(pairLabel(ld.pairedCards)) + ' 버림!</span>' : ''}`, ld.paired ? 1000 : 700); }
       render(); busy = false;
       setTimeout(maybeBot, 350);
     }, 750);
@@ -237,7 +263,7 @@
     if (ld && ld.seq && ld.seq !== App2.lastSeq) {
       App2.lastSeq = ld.seq;
       ld.paired ? Sfx.pair() : Sfx.flip();
-      Fx.toast(`<b>${esc(nmIn(pub.players, ld.byId))}</b> ← ${esc(nmIn(pub.players, ld.fromId))}${ld.paired ? ' · 짝!' : ''}`, 800);
+      Fx.toast(`<b>${esc(nmIn(pub.players, ld.byId))}</b> ← ${esc(nmIn(pub.players, ld.fromId))}${ld.paired ? ' · <span style="color:var(--ok)">' + esc(pairLabel(ld.pairedCards)) + ' 버림!</span>' : ''}`, ld.paired ? 1000 : 800);
       if (ld.paired) Fx.sparkle('white');
     }
   };

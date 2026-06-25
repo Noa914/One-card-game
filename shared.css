@@ -8,7 +8,7 @@
   --ivory:#f6f0e2; --ink:#23262d; --red:#d23b3b;
   --gold:#e8b13a; --danger:#f0512f; --text:#e9ecf1; --muted:#9aa0a8;
   --line:#2c3038; --ok:#5fb87a; --radius:14px;
-  --card-w:clamp(54px,15vw,92px); --card-h:calc(var(--card-w)*1.4);
+  --card-w:clamp(56px,9.5vw,124px); --card-h:calc(var(--card-w)*1.4);
   font-synthesis-weight:none;
 }
 *{box-sizing:border-box}

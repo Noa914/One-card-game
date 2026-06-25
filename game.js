@@ -115,6 +115,7 @@
       this.winner = null;
       this.log = [];
       this.lastAction = null;     // {type, playerId, card, ...} UI 연출용
+      this.seq = 0;               // 액션 시퀀스 (이펙트 중복 방지용)
       this._say(`게임 시작 · 시작 카드 ${this.discard[0] && this.label(this.discard[0])}`);
       return this;
     }
@@ -216,10 +217,12 @@
       const card = hand[idx];
       if (!this.isPlayable(card)) return { ok: false, error: '낼 수 없는 카드' };
 
+      const wasUnderAttack = this.attackActive && this.pendingAttack > 0;
+
       // 손에서 제거 → 버린 더미로
       hand.splice(idx, 1);
       this.discard.push(card);
-      this.lastAction = { type: 'play', playerId: pid, card };
+      this.lastAction = { type: 'play', playerId: pid, card, counter: wasUnderAttack, seq: ++this.seq };
 
       // 무늬 갱신
       if (isJoker(card)) {
@@ -288,7 +291,7 @@
         wasAttack = true;
       }
       const drawn = this._draw(pid, k);
-      this.lastAction = { type: 'draw', playerId: pid, count: drawn.length, wasAttack };
+      this.lastAction = { type: 'draw', playerId: pid, count: drawn.length, wasAttack, seq: ++this.seq };
       this._say(`${this.playerName(pid)} ${wasAttack ? `공격 ${drawn.length}장 받음` : `1장 뽑기`}`);
 
       if (wasAttack) { this.pendingAttack = 0; this.attackActive = false; }
